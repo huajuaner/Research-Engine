@@ -3,8 +3,6 @@ package main
 import (
 	"encoding/csv"
 	"fmt"
-	"github.com/PuerkitoBio/goquery"
-	"github.com/huichen/sego"
 	"log"
 	"math"
 	"net/http"
@@ -14,6 +12,9 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/PuerkitoBio/goquery"
+	"github.com/huichen/sego"
 )
 
 type Node struct {
@@ -73,6 +74,12 @@ func SquuzeSegments(dst , title string,base [] string ){
 	mmp := make ( map[string] float64)
 	for _,i := range base{
 		mmp[i] += 1
+	}
+	titleSeg := segmenter.Segment([]byte(title))
+	titlestring := sego.SegmentsToSlice(titleSeg,true)
+
+	for _,i := range titlestring {
+		mmp[i] += 3
 	}
 	length := float64( len(base) )
 	for i := range mmp {
@@ -186,7 +193,7 @@ func WriteJBMap (path string ) {
 	for i:= range Jiebamap.mmp{
 		p := Jiebamap.mmp[i]
 		for p!=nil {
-			line := [] string{p.title,p.dsturl,strconv.FormatFloat(p.frequency,'E',-1,64), i}
+			line := [] string{"\""+p.title+"\"",p.dsturl,strconv.FormatFloat(p.frequency,'E',-1,64), i}
 			err := writer.Write(line)
 			if err !=nil {
 				panic (err)
@@ -217,7 +224,7 @@ func Organize () {
 func main() {
 	var wg sync.WaitGroup
 	wg.Add( 1 )
-	segmenter.LoadDictionary("C:/Users/zzy/Desktop/programs/GoResearchEngine/Research-Engine/src/github.com/huichen/sego/data/dictionary.txt")
+	segmenter.LoadDictionary("C:/Users/zzy/Desktop/programs/GoResearchEngine/Research-Engine/src/crawler/dictionary.txt")
 	//go MyCrawler("http://www.hitsz.edu.cn/article/view/id-98581.html",0,&wg)
 	go MyCrawler("http://www.hitsz.edu.cn/article/index.html",0,&wg)
 	//go MyCrawler("http://portal.hitsz.edu.cn/portal",-1,&wg)

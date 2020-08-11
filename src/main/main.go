@@ -1,228 +1,113 @@
 package main
 
 import (
+	"bufio"
 	"encoding/csv"
 	"fmt"
-	"github.com/PuerkitoBio/goquery"
-	"github.com/huichen/sego"
 	"log"
-	"math"
-	"net/http"
-	"net/url"
 	"os"
-	"regexp"
+	"sort"
 	"strconv"
 	"strings"
-	"sync"
-)
 
-type Node struct {
-	IfValidate bool
-	title string
-	author string
-	publisher string
-	abstract string
-}
+	"github.com/huichen/sego"
+)
 
 type UrlNode struct {
-	title string
-	dsturl string
+	title     string
+	dsturl    string
 	frequency float64
-	next  * UrlNode
+	next      *UrlNode
 }
 
-type typeSafeSaver struct {
-	mmp map [string] Node
-	mux sync.Mutex
+type MyNode struct {
+	title string
+	frequency float64
+	dsturl string
 }
-type SeJiebamap struct {
-	mmp map [string] *UrlNode
-	mux sync.Mutex
-}
-
 var (
-	segmenter sego.Segmenter
-	WebLimit = make (chan bool , 100 )
-	SafeSaver =typeSafeSaver{mmp:make (map[string] Node)}
-	Jiebamap = SeJiebamap{mmp:make(map[string] *UrlNode)}
-	SumOfPages int
+	inputReader = bufio.NewReader(os.Stdin)
+	segmenter  sego.Segmenter
+	JiebaMap = make(map[string]*UrlNode)
 )
 
-func UrlValidate (uri string )(Is bool ) {
-	if uri != "" {
-		Is ,_ = regexp.MatchString(`^(https?)://[-A-Za-z-1-9+&@#/%?=~_|!:,.;]+[-A-Za-z0-9+&@#/%=~_|]`,uri)
-		if Is {
-			Is ,_ = regexp.MatchString(`hitsz.edu.cn`,uri)
-		}
-		return
-	}
-	Is = false
-	return
-}
-
-func FurtherValidate(uri string) (Is bool) {
-	if uri != "" {
-		Is, _ = regexp.MatchString(`http://www.hitsz.edu.cn/article/view/id-[\d]+.html$`, uri)
-		return
-	}
-	Is = false
-	return
-}
-
-func SquuzeSegments(dst , title string,base [] string ){
-	mmp := make ( map[string] float64)
-	for _,i := range base{
-		mmp[i] += 1
-	}
-	length := float64( len(base) )
-	for i := range mmp {
-		Jiebamap.mux.Lock()
-		j,ok := Jiebamap.mmp[i]
-		if ok == false {
-			j = nil
-		}
-		cur := UrlNode{
-			title:     title,
-			dsturl:    dst,
-			frequency: mmp[i]/length,
-			next:      j,
-		}
-		Jiebamap.mmp[i] = &cur
-		Jiebamap.mux.Unlock()
-	}
-}
-
-func MyCrawler(dst string, depth int, wg *sync.WaitGroup) {
-	defer fmt.Println(dst ," crawler finished ")
-	WebLimit <- true
-	defer func(){
-		<-WebLimit
-	}()
-	defer wg.Done()
-
-	SafeSaver.mux.Lock()
-
-	if _,ok := SafeSaver.mmp[dst];ok {
-		defer SafeSaver.mux.Unlock()
-		return
-	}
-	SafeSaver.mmp[dst] = Node{
-		IfValidate: true,
-	}
-	SafeSaver.mux.Unlock()
-
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", dst, nil)
-	req.Header.Set("User-Agent", "Golang_Spider_Bot/3.0")
-	res, err := client.Do(req)
+func ReadMap (path string ) {
+	file,err := os.Open( path )
 	if err != nil {
-		log.Println(err)
-		return
-	}
-
-
-	defer res.Body.Close()
-	if res.StatusCode != 200 {
-		log.Println(dst ," response was not 200")
-		return
-	}
-
-	doc, err := goquery.NewDocumentFromReader(res.Body)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
-	doc.Find("a").Each(func(i int, sel *goquery.Selection) {
-		uri, IfExist := sel.Attr("href")
-		if IfExist == false {
-			return
-		}
-		if UrlValidate(uri) == false {
-			NewUrl,err := url.Parse(uri)
-			if err != nil {
-				return
-			}
-			BaseUrl,err := url.Parse(dst)
-			if err != nil {
-				return
-			}
-			uri = BaseUrl.ResolveReference(NewUrl).String()
-		}
-		if UrlValidate(uri) == false {
-			return
-		}
-		if IfExist == true && depth <= 1 {
-			wg.Add(1)
-			go MyCrawler(uri,depth+1,wg)
-		}
-	})
-	if FurtherValidate(dst) == false {
-		return
-	}
-	// Find the review items
-	SumOfPages ++
-	doc.Find("div.detail_out").Each(func(i int, s *goquery.Selection) {
-		title := s.Find("div.title").Text()
-		context := s.Find("div.edittext").Text()
-		context = strings.Replace(context," ","",-1)
-		context = strings.Replace(context,"\n","",-1)
-		context = strings.Replace(context,"\r","",-1)
-		segments:= segmenter.Segment([] byte(context) )
-		slices := sego.SegmentsToSlice(segments,true)
-		SquuzeSegments(dst,title,slices)
-	})
-	return
-}
-
-func WriteJBMap (path string ) {
-	defer fmt.Println(path," writen coorrectly")
-	csvFile,err := os.Create(path)
-	if err != nil{
+		log.Println("Failed To Open ",path)
 		panic (err)
 	}
-	defer csvFile.Close()
-	writer := csv.NewWriter(csvFile)
-	for i:= range Jiebamap.mmp{
-		p := Jiebamap.mmp[i]
+	defer file .Close()
+
+	reader := csv.NewReader(file)
+	reader.FieldsPerRecord = -1
+	record , err := reader.ReadAll()
+	if err != nil {
+		log.Println("Failed To Read ",path)
+		panic(err)
+	}
+
+	for _,item := range record {
+		frequency, _ := strconv.ParseFloat(item[2],64)
+		item[0] = strings.Replace(item[0],"\"","",-1)
+		node := UrlNode{
+			title:     item[0],
+			dsturl:    item[1],
+			frequency: frequency,
+			next:      JiebaMap[item[3]],
+		}
+		JiebaMap[item[3]] = & node
+	}
+}
+
+func PrintMap () {
+	for i:= range JiebaMap {
+		p := JiebaMap[i]
 		for p!=nil {
-			line := [] string{p.title,p.dsturl,strconv.FormatFloat(p.frequency,'E',-1,64), i}
-			err := writer.Write(line)
-			if err !=nil {
-				panic (err)
+			fmt.Println( *p,i )
+			p = p.next
+		}
+	}
+}
+func QueryResponse (query string ){
+	segments := segmenter.Segment([] byte(query))
+	slices := sego.SegmentsToSlice(segments,true)
+	fmt.Println(slices)
+	mmp := make (map [string] MyNode )
+	for _,i := range slices {
+		p := JiebaMap[i]
+		for p!=nil {
+			cur,_ := mmp[p.dsturl]
+			mmp[p.dsturl] = MyNode{
+				title:     p.title,
+				frequency: cur.frequency+p.frequency,
 			}
 			p = p.next
 		}
 	}
-	writer.Flush()
-}
-
-func Organize () {
-	for i := range Jiebamap.mmp{
-		count := 0
-		p := Jiebamap.mmp[i]
-		for p != nil {
-			count ++
-			p = p.next
-		}
-		bias := math.Log(float64(SumOfPages)/float64(count+1))
-		p = Jiebamap.mmp[i]
-		for p!= nil {
-			p.frequency *= bias
-			p = p.next
-		}
+	Base := make ([]MyNode,0)
+	for i := range mmp {
+		Base = append(Base, MyNode{
+			title:     mmp[i].title,
+			frequency: mmp[i].frequency,
+			dsturl:    i,
+		})
 	}
+	sort.SliceStable(Base , func (i,j int)bool {return Base[i].frequency<Base[i].frequency})
+	fmt.Println(Base)
 }
+func Response (){
+	query,err := inputReader.ReadString('\n')
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	QueryResponse(query)
 
+}
 func main() {
-	var wg sync.WaitGroup
-	wg.Add( 1 )
-	segmenter.LoadDictionary("C:/Users/zzy/Desktop/programs/GoResearchEngine/Research-Engine/src/github.com/huichen/sego/data/dictionary.txt")
-	//go MyCrawler("http://www.hitsz.edu.cn/article/view/id-98581.html",0,&wg)
-	go MyCrawler("http://www.hitsz.edu.cn/article/index.html",0,&wg)
-	//go MyCrawler("http://portal.hitsz.edu.cn/portal",-1,&wg)
-	wg.Wait()
-	fmt.Println("correct ending ")
-	Organize()
-	WriteJBMap("C:/Users/zzy/Desktop/programs/GoResearchEngine/Research-Engine/src/main/mmp")
+	ReadMap("C:/Users/zzy/Desktop/programs/GoResearchEngine/Research-Engine/src/main/mmp")
+	segmenter.LoadDictionary("C:/Users/zzy/Desktop/programs/GoResearchEngine/Research-Engine/src/crawler/dictionary.txt")
+	//PrintMap()
+	Response()
 }
