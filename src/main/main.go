@@ -2,21 +2,20 @@ package main
 
 import (
 	"bufio"
-	"encoding/csv"
+	"encoding/json"
 	"fmt"
+	"github.com/huichen/sego"
+	"io"
 	"log"
 	"os"
 	"sort"
-	"strconv"
-	"strings"
-
-	"github.com/huichen/sego"
 )
 
 type UrlNode struct {
 	title     string
 	dsturl    string
 	frequency float64
+	pos [] int
 	next      *UrlNode
 }
 
@@ -39,25 +38,49 @@ func ReadMap (path string ) {
 	}
 	defer file .Close()
 
-	reader := csv.NewReader(file)
-	reader.FieldsPerRecord = -1
-	record , err := reader.ReadAll()
-	if err != nil {
-		log.Println("Failed To Read ",path)
-		panic(err)
-	}
-
-	for _,item := range record {
-		frequency, _ := strconv.ParseFloat(item[2],64)
-		item[0] = strings.Replace(item[0],"\"","",-1)
-		node := UrlNode{
-			title:     item[0],
-			dsturl:    item[1],
-			frequency: frequency,
-			next:      JiebaMap[item[3]],
+	chunks := make ([]byte , 0)
+	buf := make ([]byte,1024)
+	for {
+		n,err := file.Read(buf)
+		if err !=nil && err != io.EOF{
+			log.Fatalln(err)
 		}
-		JiebaMap[item[3]] = & node
+		if 0 == n {
+			break
+		}
+		chunks = append(chunks, buf[:n]...)
 	}
+	type CurNode struct {
+		title string
+		frequency float64
+		dsturl string
+		pos []int
+	}
+	base := make([]CurNode,0)
+	err = json.Unmarshal(chunks,&base)
+	if err !=nil {
+		log.Fatalln(err)
+	}
+	fmt.Println(base)
+	//reader := csv.NewReader(file)
+	//reader.FieldsPerRecord = -1
+	//record , err := reader.ReadAll()
+	//if err != nil {
+	//	log.Println("Failed To Read ",path)
+	//	panic(err)
+	//}
+	//
+	//for _,item := range record {
+	//	frequency, _ := strconv.ParseFloat(item[2],64)
+	//	item[0] = strings.Replace(item[0],"\"","",-1)
+	//	node := UrlNode{
+	//		title:     item[0],
+	//		dsturl:    item[1],
+	//		frequency: frequency,
+	//		next:      JiebaMap[item[3]],
+	//	}
+	//	JiebaMap[item[3]] = & node
+	//}
 }
 
 func PrintMap () {
@@ -93,8 +116,12 @@ func QueryResponse (query string ){
 			dsturl:    i,
 		})
 	}
-	sort.SliceStable(Base , func (i,j int)bool {return Base[i].frequency<Base[i].frequency})
-	fmt.Println(Base)
+	sort.Slice(Base , func (i,j int)bool {
+		return Base[i].frequency>Base[j].frequency
+	})
+	for _,i:= range Base {
+		fmt.Println(i)
+	}
 }
 func Response (){
 	query,err := inputReader.ReadString('\n')
@@ -106,7 +133,7 @@ func Response (){
 
 }
 func main() {
-	ReadMap("C:/Users/zzy/Desktop/programs/GoResearchEngine/Research-Engine/src/main/mmp")
+	ReadMap("C:/Users/zzy/Desktop/programs/GoResearchEngine/Research-Engine/src/main/backupmmp")
 	segmenter.LoadDictionary("C:/Users/zzy/Desktop/programs/GoResearchEngine/Research-Engine/src/crawler/dictionary.txt")
 	//PrintMap()
 	Response()

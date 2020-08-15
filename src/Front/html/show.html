@@ -1,10 +1,54 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
     <meta charset="UTF-8">
-    <title>$Title$</title>
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
 </head>
 <body>
-$END$
+
+<div id="app">
+    <img src="../imgs/logo.PNG"
+         id = "logo">
+
+    <div>
+        {{ range . }}
+            <el-row id = "show">
+               {{ .Title }}
+                <el-link href={{.Dsturl}} type="primary">
+                    {{ .Dsturl }}
+                </el-link>
+            </el-row>
+        {{ end }}
+    </div>
+</div>
 </body>
+
+
+<style>
+    #app {
+        position: relative;
+        top: 10px;
+    }
+    #app #logo {
+        position: relative;
+        left:35%;
+    }
+    #app #show {
+        position: relative;
+        left: 25%;
+        height: 50px;
+    }
+</style>
+
+<script src="https://unpkg.com/vue/dist/vue.js"></script>
+<script src="https://unpkg.com/element-ui/lib/index.js"></script>
+<script>
+    new Vue({
+        el: '#app',
+        data: function () {
+            return {}
+        }
+    })
+</script>
+
 </html>
