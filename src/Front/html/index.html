@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+</head>
+<body>
+<div id="app">
+    <img
+            src="../imgs/logo.PNG"
+            id="logo">
+    <div id="inline">
+        <el-input
+                v-model="input"
+                placeholder="请输入内容"
+                id="Input">
+        </el-input>
+        <el-button
+                @click="jump"
+                id="button"
+                type="primary"
+                icon="el-icon-search">
+            搜索
+        </el-button>
+    </div>
+</div>
+</body>
+
+
+<style>
+    #app {
+        position: relative;
+        top: 150px;
+    }
+
+    #app #logo {
+        position: relative;
+        left: 35%;
+    }
+
+    #app #Input {
+        position: relative;
+        left: 35%;
+        width: 650px;
+        height: 50px;
+    }
+
+    #app #button {
+        position: relative;
+        top: -50px;
+        left: 25%;
+        height: 50px;
+    }
+</style>
+<script src="https://unpkg.com/vue/dist/vue.js"></script>
+<script src="https://unpkg.com/element-ui/lib/index.js"></script>
+<script>
+    new Vue({
+        el: '#app',
+        data: function () {
+            return {
+                input: ''
+            }
+        },
+        methods: {
+            jump:function (){
+                if (this.input!=""){
+                    alert("localhost:8080/index/" + this.input)
+                    console.log();
+                    window.location.href = window.location +"/"+ this.input
+                }
+            }
+        }
+    })
+</script>
+
+</html>
